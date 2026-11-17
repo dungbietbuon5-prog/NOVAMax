@@ -13,13 +13,26 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4 
 
-      - name: Build Unsigned App
+      - name: Auto Detect Project & Build Unsigned App
         run: |
-          # Build project (Không ký)
-          # LƯU Ý: Sửa "Tên_Project_Cua_May" và "Tên_Scheme" cho đúng với source của mày
+          # Tự động tìm file .xcodeproj đầu tiên trong thư mục
+          PROJECT_FILE=$(find . -name "*.xcodeproj" -maxdepth 2 | head -n 1)
+          
+          if [ -z "$PROJECT_FILE" ]; then
+            echo "❌ Không tìm thấy file .xcodeproj nào trong source code!"
+            exit 1
+          fi
+          
+          echo "✅ Tìm thấy Project: $PROJECT_FILE"
+          
+          # Lấy tên scheme mặc định dựa trên tên project
+          SCHEME_NAME=$(basename "$PROJECT_FILE" .xcodeproj)
+          echo "✅ Sử dụng Scheme: $SCHEME_NAME"
+          
+          # Build project
           xcodebuild clean build \
-            -project "Tên_Project_Cua_May.xcodeproj" \
-            -scheme "Tên_Scheme" \
+            -project "$PROJECT_FILE" \
+            -scheme "$SCHEME_NAME" \
             -sdk iphoneos \
             -configuration Release \
             -derivedDataPath ./build \
@@ -29,9 +42,19 @@ jobs:
 
       - name: Package to IPA
         run: |
+          # Tìm file .app vừa build xong
+          APP_PATH=$(find ./build/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -n 1)
+          
+          if [ -z "$APP_PATH" ]; then
+            echo "❌ Không tìm thấy file .app sau khi build!"
+            exit 1
+          fi
+          
+          echo "✅ Đã build thành công: $APP_PATH"
+          
+          # Đóng gói thành IPA
           mkdir -p ./build/Payload
-          # LƯU Ý: Sửa "Tên_App.app" thành tên file app thực tế
-          cp -r ./build/Build/Products/Release-iphoneos/Tên_App.app ./build/Payload/
+          cp -r "$APP_PATH" ./build/Payload/
           cd ./build
           zip -r App_Unsigned.ipa Payload
 
