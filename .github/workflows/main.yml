@@ -15,23 +15,33 @@ jobs:
 
       - name: Auto Detect Project & Build Unsigned App
         run: |
-          # Tự động tìm file .xcodeproj đầu tiên trong thư mục
-          PROJECT_FILE=$(find . -name "*.xcodeproj" -maxdepth 2 | head -n 1)
+          # 1. Tìm file .xcworkspace trước (thường được ưu tiên nếu có dùng CocoaPods)
+          WORKSPACE_FILE=$(find . -name "*.xcworkspace" -not -path "*/project.xcworkspace/*" | head -n 1)
           
-          if [ -z "$PROJECT_FILE" ]; then
-            echo "❌ Không tìm thấy file .xcodeproj nào trong source code!"
+          # 2. Tìm file .xcodeproj (nếu không có workspace)
+          PROJECT_FILE=$(find . -name "*.xcodeproj" | head -n 1)
+          
+          if [ -n "$WORKSPACE_FILE" ]; then
+            echo "✅ Tìm thấy Workspace: $WORKSPACE_FILE"
+            BUILD_FLAG="-workspace"
+            BUILD_TARGET="$WORKSPACE_FILE"
+            SCHEME_NAME=$(basename "$WORKSPACE_FILE" .xcworkspace)
+          elif [ -n "$PROJECT_FILE" ]; then
+            echo "✅ Tìm thấy Project: $PROJECT_FILE"
+            BUILD_FLAG="-project"
+            BUILD_TARGET="$PROJECT_FILE"
+            SCHEME_NAME=$(basename "$PROJECT_FILE" .xcodeproj)
+          else
+            echo "❌ LỖI: Không tìm thấy file .xcodeproj hay .xcworkspace nào trong toàn bộ source code!"
+            echo "Vui lòng kiểm tra lại xem mày đã up đúng source code chưa."
             exit 1
           fi
           
-          echo "✅ Tìm thấy Project: $PROJECT_FILE"
-          
-          # Lấy tên scheme mặc định dựa trên tên project
-          SCHEME_NAME=$(basename "$PROJECT_FILE" .xcodeproj)
-          echo "✅ Sử dụng Scheme: $SCHEME_NAME"
+          echo "✅ Sử dụng Scheme mặc định: $SCHEME_NAME"
           
           # Build project
           xcodebuild clean build \
-            -project "$PROJECT_FILE" \
+            $BUILD_FLAG "$BUILD_TARGET" \
             -scheme "$SCHEME_NAME" \
             -sdk iphoneos \
             -configuration Release \
@@ -46,7 +56,7 @@ jobs:
           APP_PATH=$(find ./build/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -n 1)
           
           if [ -z "$APP_PATH" ]; then
-            echo "❌ Không tìm thấy file .app sau khi build!"
+            echo "❌ LỖI: Build không tạo ra file .app!"
             exit 1
           fi
           
