@@ -17,24 +17,29 @@ jobs:
         run: |
           echo "🔍 Đang quét thư mục để tìm source code..."
 
-          # 1. Tìm và giải nén file .zip
-          ARCHIVE_FILE=$(find . -maxdepth 2 -type f \( -name "*.zip" -o -name "*.ipa" -o -name "*.deb" \) | head -n 1)
+          # 1. Tìm file nén
+          ARCHIVE_FILE=$(find . -maxdepth 2 -type f \( -name "*.zip" -o -name "*.ipa" \) | head -n 1)
 
           if [ -n "$ARCHIVE_FILE" ]; then
             echo "📦 Tìm thấy file nén: $ARCHIVE_FILE. Tiến hành giải nén..."
             mkdir -p ./extracted
             unzip -q "$ARCHIVE_FILE" -d ./extracted || true
+            
+            # XÓA THƯ MỤC RÁC CỦA MAC
+            echo "🧹 Đang dọn dẹp thư mục rác __MACOSX và file .DS_Store..."
+            find ./extracted -name "__MACOSX" -type d -exec rm -rf {} + 2>/dev/null || true
+            find ./extracted -name ".DS_Store" -type f -delete 2>/dev/null || true
           else
-            echo "📂 Không có file nén. Tìm source code trực tiếp..."
+            echo "📂 Không có file nén. Copy source code..."
             mkdir -p ./extracted
             cp -r ./* ./extracted/
           fi
 
           cd ./extracted
 
-          # 2. Tìm file dự án Xcode
-          WORKSPACE_FILE=$(find . -name "*.xcworkspace" -not -path "*/project.xcworkspace/*" | head -n 1)
-          PROJECT_FILE=$(find . -name "*.xcodeproj" | head -n 1)
+          # 2. Tìm file dự án Xcode (Bỏ qua mọi thư mục rác)
+          WORKSPACE_FILE=$(find . -name "*.xcworkspace" -not -path "*__MACOSX*" -not -path "*/project.xcworkspace/*" | head -n 1)
+          PROJECT_FILE=$(find . -name "*.xcodeproj" -not -path "*__MACOSX*" | head -n 1)
 
           if [ -n "$WORKSPACE_FILE" ]; then
             BUILD_FLAG="-workspace"
@@ -49,7 +54,7 @@ jobs:
             exit 1
           fi
           
-          # 3. QUAN TRỌNG: Tự động tìm tên Scheme thực tế bên trong Project
+          # 3. Tìm Scheme tự động
           echo "🔍 Đang tìm danh sách các Scheme..."
           SCHEMES=$(xcodebuild -list $BUILD_FLAG "$BUILD_TARGET" | awk '/Schemes:/{flag=1; next} /^$/{flag=0} flag')
           
@@ -62,7 +67,7 @@ jobs:
           SCHEME_NAME=$(echo "$SCHEMES" | head -n 1 | xargs)
           echo "✅ Sử dụng Scheme: $SCHEME_NAME"
           
-          # 4. Build project với Scheme vừa tìm được
+          # 4. Build project
           xcodebuild clean build \
             $BUILD_FLAG "$BUILD_TARGET" \
             -scheme "$SCHEME_NAME" \
@@ -77,7 +82,6 @@ jobs:
         run: |
           cd ./extracted
           
-          # Đóng gói file .app thành .ipa
           APP_PATH=$(find ./build/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -n 1)
           
           if [ -z "$APP_PATH" ]; then
