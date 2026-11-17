@@ -17,13 +17,12 @@ jobs:
         run: |
           echo "🔍 Đang quét thư mục để tìm source code..."
 
-          # 1. Kiểm tra nếu mày up file nén .zip hoặc .ipa hoặc .deb lên
+          # 1. Tìm và giải nén file .zip
           ARCHIVE_FILE=$(find . -maxdepth 2 -type f \( -name "*.zip" -o -name "*.ipa" -o -name "*.deb" \) | head -n 1)
 
           if [ -n "$ARCHIVE_FILE" ]; then
             echo "📦 Tìm thấy file nén: $ARCHIVE_FILE. Tiến hành giải nén..."
             mkdir -p ./extracted
-            # Giải nén file
             unzip -q "$ARCHIVE_FILE" -d ./extracted || true
           else
             echo "📂 Không có file nén. Tìm source code trực tiếp..."
@@ -38,24 +37,32 @@ jobs:
           PROJECT_FILE=$(find . -name "*.xcodeproj" | head -n 1)
 
           if [ -n "$WORKSPACE_FILE" ]; then
-            echo "✅ Tìm thấy Workspace: $WORKSPACE_FILE"
             BUILD_FLAG="-workspace"
             BUILD_TARGET="$WORKSPACE_FILE"
-            SCHEME_NAME=$(basename "$WORKSPACE_FILE" .xcworkspace)
+            echo "✅ Tìm thấy Workspace: $BUILD_TARGET"
           elif [ -n "$PROJECT_FILE" ]; then
-            echo "✅ Tìm thấy Project: $PROJECT_FILE"
             BUILD_FLAG="-project"
             BUILD_TARGET="$PROJECT_FILE"
-            SCHEME_NAME=$(basename "$PROJECT_FILE" .xcodeproj)
+            echo "✅ Tìm thấy Project: $BUILD_TARGET"
           else
-            echo "❌ LỖI NGHIÊM TRỌNG: Không tìm thấy file .xcodeproj hay .xcworkspace nào trong toàn bộ source code!"
-            echo "Lý do: Mày đang up file .ipa/.zip/.deb đã build sẵn, hoặc up thiếu file Project Xcode."
+            echo "❌ LỖI: Không tìm thấy file .xcodeproj hay .xcworkspace!"
             exit 1
           fi
           
-          echo "🔨 Bắt đầu build với Scheme: $SCHEME_NAME"
+          # 3. QUAN TRỌNG: Tự động tìm tên Scheme thực tế bên trong Project
+          echo "🔍 Đang tìm danh sách các Scheme..."
+          SCHEMES=$(xcodebuild -list $BUILD_FLAG "$BUILD_TARGET" | awk '/Schemes:/{flag=1; next} /^$/{flag=0} flag')
           
-          # 3. Build project
+          if [ -z "$SCHEMES" ]; then
+            echo "❌ Không tìm thấy Scheme nào trong Project!"
+            exit 1
+          fi
+          
+          # Lấy Scheme đầu tiên tìm được
+          SCHEME_NAME=$(echo "$SCHEMES" | head -n 1 | xargs)
+          echo "✅ Sử dụng Scheme: $SCHEME_NAME"
+          
+          # 4. Build project với Scheme vừa tìm được
           xcodebuild clean build \
             $BUILD_FLAG "$BUILD_TARGET" \
             -scheme "$SCHEME_NAME" \
@@ -70,7 +77,7 @@ jobs:
         run: |
           cd ./extracted
           
-          # 4. Đóng gói file .app thành .ipa
+          # Đóng gói file .app thành .ipa
           APP_PATH=$(find ./build/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -n 1)
           
           if [ -z "$APP_PATH" ]; then
