@@ -13,13 +13,10 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4 
 
-      - name: Select Xcode
-        # Đã sửa lại đường dẫn Xcode mới nhất để không bị lỗi
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app
-
       - name: Build Unsigned App
         run: |
-          # LƯU Ý: Sửa tên project và scheme của mày vào đây
+          # Build project (Không ký)
+          # LƯU Ý: Sửa "Tên_Project_Cua_May" và "Tên_Scheme" cho đúng với source của mày
           xcodebuild clean build \
             -project "Tên_Project_Cua_May.xcodeproj" \
             -scheme "Tên_Scheme" \
@@ -33,7 +30,7 @@ jobs:
       - name: Package to IPA
         run: |
           mkdir -p ./build/Payload
-          # LƯU Ý: Sửa tên file app của mày
+          # LƯU Ý: Sửa "Tên_App.app" thành tên file app thực tế
           cp -r ./build/Build/Products/Release-iphoneos/Tên_App.app ./build/Payload/
           cd ./build
           zip -r App_Unsigned.ipa Payload
