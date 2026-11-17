@@ -13,14 +13,30 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4 
 
-      - name: Auto Detect Project & Build Unsigned App
+      - name: Auto Extract and Build
         run: |
-          # 1. Tìm file .xcworkspace trước (thường được ưu tiên nếu có dùng CocoaPods)
+          echo "🔍 Đang quét thư mục để tìm source code..."
+
+          # 1. Kiểm tra nếu mày up file nén .zip hoặc .ipa hoặc .deb lên
+          ARCHIVE_FILE=$(find . -maxdepth 2 -type f \( -name "*.zip" -o -name "*.ipa" -o -name "*.deb" \) | head -n 1)
+
+          if [ -n "$ARCHIVE_FILE" ]; then
+            echo "📦 Tìm thấy file nén: $ARCHIVE_FILE. Tiến hành giải nén..."
+            mkdir -p ./extracted
+            # Giải nén file
+            unzip -q "$ARCHIVE_FILE" -d ./extracted || true
+          else
+            echo "📂 Không có file nén. Tìm source code trực tiếp..."
+            mkdir -p ./extracted
+            cp -r ./* ./extracted/
+          fi
+
+          cd ./extracted
+
+          # 2. Tìm file dự án Xcode
           WORKSPACE_FILE=$(find . -name "*.xcworkspace" -not -path "*/project.xcworkspace/*" | head -n 1)
-          
-          # 2. Tìm file .xcodeproj (nếu không có workspace)
           PROJECT_FILE=$(find . -name "*.xcodeproj" | head -n 1)
-          
+
           if [ -n "$WORKSPACE_FILE" ]; then
             echo "✅ Tìm thấy Workspace: $WORKSPACE_FILE"
             BUILD_FLAG="-workspace"
@@ -32,14 +48,14 @@ jobs:
             BUILD_TARGET="$PROJECT_FILE"
             SCHEME_NAME=$(basename "$PROJECT_FILE" .xcodeproj)
           else
-            echo "❌ LỖI: Không tìm thấy file .xcodeproj hay .xcworkspace nào trong toàn bộ source code!"
-            echo "Vui lòng kiểm tra lại xem mày đã up đúng source code chưa."
+            echo "❌ LỖI NGHIÊM TRỌNG: Không tìm thấy file .xcodeproj hay .xcworkspace nào trong toàn bộ source code!"
+            echo "Lý do: Mày đang up file .ipa/.zip/.deb đã build sẵn, hoặc up thiếu file Project Xcode."
             exit 1
           fi
           
-          echo "✅ Sử dụng Scheme mặc định: $SCHEME_NAME"
+          echo "🔨 Bắt đầu build với Scheme: $SCHEME_NAME"
           
-          # Build project
+          # 3. Build project
           xcodebuild clean build \
             $BUILD_FLAG "$BUILD_TARGET" \
             -scheme "$SCHEME_NAME" \
@@ -52,17 +68,16 @@ jobs:
 
       - name: Package to IPA
         run: |
-          # Tìm file .app vừa build xong
+          cd ./extracted
+          
+          # 4. Đóng gói file .app thành .ipa
           APP_PATH=$(find ./build/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -n 1)
           
           if [ -z "$APP_PATH" ]; then
-            echo "❌ LỖI: Build không tạo ra file .app!"
+            echo "❌ Lỗi: Không tìm thấy file .app sau khi build!"
             exit 1
           fi
           
-          echo "✅ Đã build thành công: $APP_PATH"
-          
-          # Đóng gói thành IPA
           mkdir -p ./build/Payload
           cp -r "$APP_PATH" ./build/Payload/
           cd ./build
@@ -72,4 +87,4 @@ jobs:
         uses: actions/upload-artifact@v4 
         with:
           name: Unsigned-IPA
-          path: ./build/App_Unsigned.ipa
+          path: ./extracted/build/App_Unsigned.ipa
