@@ -3,7 +3,7 @@ name: Build Unsigned IPA
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch: # Cho phép bấm chạy bằng tay từ tab Actions
+  workflow_dispatch: 
 
 jobs:
   build:
@@ -11,15 +11,15 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4 # Đã nâng cấp lên v4
+        uses: actions/checkout@v4 
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.0.app
+        # Đã sửa lại đường dẫn Xcode mới nhất để không bị lỗi
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
 
       - name: Build Unsigned App
         run: |
-          # Build project (Không ký)
-          # LƯU Ý: Sửa "Tên_Project_Cua_May" và "Tên_Scheme" cho đúng với source của mày
+          # LƯU Ý: Sửa tên project và scheme của mày vào đây
           xcodebuild clean build \
             -project "Tên_Project_Cua_May.xcodeproj" \
             -scheme "Tên_Scheme" \
@@ -32,19 +32,14 @@ jobs:
 
       - name: Package to IPA
         run: |
-          # Tạo thư mục Payload
           mkdir -p ./build/Payload
-          
-          # Copy file .app vào thư mục Payload
-          # LƯU Ý: Sửa "Tên_App.app" thành tên file .app thực tế của mày
+          # LƯU Ý: Sửa tên file app của mày
           cp -r ./build/Build/Products/Release-iphoneos/Tên_App.app ./build/Payload/
-          
-          # Nén thành file .ipa
           cd ./build
           zip -r App_Unsigned.ipa Payload
 
       - name: Upload IPA Artifact
-        uses: actions/upload-artifact@v4 # Đã nâng cấp lên v4 để fix lỗi của GitHub
+        uses: actions/upload-artifact@v4 
         with:
           name: Unsigned-IPA
           path: ./build/App_Unsigned.ipa
