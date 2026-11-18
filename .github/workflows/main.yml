@@ -1,4 +1,4 @@
-name: Build Unsigned IPA
+Name: Build Unsigned IPA
 
 on:
   push:
@@ -103,6 +103,21 @@ jobs:
           
           mkdir -p ./build/Payload
           cp -r "$APP_PATH" ./build/Payload/
+          
+          # ==========================================
+          # NHÚNG TRỰC TIẾP THƯ MỤC PATCHES VÀO GÓI .APP
+          # ==========================================
+          TARGET_APP_NAME=$(basename "$APP_PATH")
+          if [ -d "Patches" ]; then
+            echo "📦 Tìm thấy thư mục Patches, đang nhúng vào .app..."
+            cp -R Patches "./build/Payload/$TARGET_APP_NAME/"
+          elif [ -d "ThreeOneOSFive/Patches" ]; then
+            echo "📦 Tìm thấy thư mục ThreeOneOSFive/Patches, đang nhúng vào .app..."
+            cp -R ThreeOneOSFive/Patches "./build/Payload/$TARGET_APP_NAME/Patches"
+          else
+            echo "⚠️ Cảnh báo: Không tìm thấy thư mục Patches!"
+          fi
+          
           cd ./build
           zip -qr App_Unsigned.ipa Payload
 
