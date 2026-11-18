@@ -67,11 +67,12 @@ jobs:
           SCHEME_NAME=$(echo "$SCHEMES" | head -n 1 | xargs)
           echo "✅ Sử dụng Scheme: $SCHEME_NAME"
           
-          # 4. Build project
+          # 4. Build project (Đã thêm -destination để fix lỗi exit code 65)
           xcodebuild clean build \
             $BUILD_FLAG "$BUILD_TARGET" \
             -scheme "$SCHEME_NAME" \
             -sdk iphoneos \
+            -destination "generic/platform=iOS" \
             -configuration Release \
             -derivedDataPath ./build \
             CODE_SIGN_IDENTITY="" \
@@ -92,7 +93,7 @@ jobs:
           mkdir -p ./build/Payload
           cp -r "$APP_PATH" ./build/Payload/
           cd ./build
-          zip -r App_Unsigned.ipa Payload
+          zip -qr App_Unsigned.ipa Payload
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4 
