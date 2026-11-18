@@ -67,7 +67,8 @@ jobs:
           SCHEME_NAME=$(echo "$SCHEMES" | head -n 1 | xargs)
           echo "✅ Sử dụng Scheme: $SCHEME_NAME"
           
-          # 4. Build project với các tham số ép buộc unsigned tối đa
+          # 4. Build project và bắt log lỗi chi tiết nếu thất bại
+          set -o pipefail
           xcodebuild clean build \
             $BUILD_FLAG "$BUILD_TARGET" \
             -scheme "$SCHEME_NAME" \
@@ -80,7 +81,14 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_ENTITLEMENTS="" \
-            PROVISIONING_PROFILE_SPECIFIER=""
+            PROVISIONING_PROFILE_SPECIFIER="" | tee xcode_build.log || {
+              echo "=========================================="
+              echo "❌ PHÁT HIỆN LỖI BUILD! CÁC DÒNG LỖI CHI TIẾT:"
+              echo "=========================================="
+              grep -i "error:" xcode_build.log || true
+              echo "=========================================="
+              exit 1
+            }
 
       - name: Package to IPA
         run: |
