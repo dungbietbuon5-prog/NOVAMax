@@ -37,7 +37,7 @@ jobs:
 
           cd ./extracted
 
-          # 2. Tìm file dự án Xcode (Bỏ qua mọi thư mục rác)
+          # 2. Tìm file dự án Xcode
           WORKSPACE_FILE=$(find . -name "*.xcworkspace" -not -path "*__MACOSX*" -not -path "*/project.xcworkspace/*" | head -n 1)
           PROJECT_FILE=$(find . -name "*.xcodeproj" -not -path "*__MACOSX*" | head -n 1)
 
@@ -63,11 +63,10 @@ jobs:
             exit 1
           fi
           
-          # Lấy Scheme đầu tiên tìm được
           SCHEME_NAME=$(echo "$SCHEMES" | head -n 1 | xargs)
           echo "✅ Sử dụng Scheme: $SCHEME_NAME"
           
-          # 4. Build project và bắt log lỗi chi tiết nếu thất bại
+          # 4. Build project
           set -o pipefail
           xcodebuild clean build \
             $BUILD_FLAG "$BUILD_TARGET" \
@@ -83,14 +82,14 @@ jobs:
             CODE_SIGN_ENTITLEMENTS="" \
             PROVISIONING_PROFILE_SPECIFIER="" | tee xcode_build.log || {
               echo "=========================================="
-              echo "❌ PHÁT HIỆN LỖI BUILD! CÁC DÒNG LỖI CHI TIẾT:"
+              echo "❌ PHÁT HIỆN LỖI BUILD! CHI TIẾT:"
               echo "=========================================="
               grep -i "error:" xcode_build.log || true
               echo "=========================================="
               exit 1
             }
 
-      - name: Package to IPA
+      - name: Package to IPA and Embed Patches
         run: |
           cd ./extracted
           
@@ -105,17 +104,19 @@ jobs:
           cp -r "$APP_PATH" ./build/Payload/
           
           # ==========================================
-          # NHÚNG TRỰC TIẾP THƯ MỤC PATCHES VÀO GÓI .APP
+          # BƯỚC NHÚNG THƯ MỤC PATCKES VÀO TRONG GÓI .APP
           # ==========================================
           TARGET_APP_NAME=$(basename "$APP_PATH")
+          DEST_APP_PATH="./build/Payload/$TARGET_APP_NAME"
+          
           if [ -d "Patches" ]; then
-            echo "📦 Tìm thấy thư mục Patches, đang nhúng vào .app..."
-            cp -R Patches "./build/Payload/$TARGET_APP_NAME/"
+            echo "📦 Đang nhúng thư mục Patches vào trong .app..."
+            cp -R Patches "$DEST_APP_PATH/"
           elif [ -d "ThreeOneOSFive/Patches" ]; then
-            echo "📦 Tìm thấy thư mục ThreeOneOSFive/Patches, đang nhúng vào .app..."
-            cp -R ThreeOneOSFive/Patches "./build/Payload/$TARGET_APP_NAME/Patches"
+            echo "📦 Đang nhúng thư mục ThreeOneOSFive/Patches vào trong .app..."
+            cp -R ThreeOneOSFive/Patches "$DEST_APP_PATH/Patches"
           else
-            echo "⚠️ Cảnh báo: Không tìm thấy thư mục Patches!"
+            echo "⚠️ Cảnh báo: Không tìm thấy thư mục Patches tại nguồn để nhúng!"
           fi
           
           cd ./build
